@@ -66,9 +66,9 @@ public final class ApolloStore {
         
         let dependentKeys = normalizer.dependentKeys
         
-        resultHandler(GraphQLResult(data: data, errors: nil, dependentKeys: dependentKeys), nil)
+        resultHandler(rootObject, GraphQLResult(data: data, errors: nil, dependentKeys: dependentKeys), nil)
       } catch {
-        resultHandler(nil, error)
+        resultHandler(nil, nil, error)
       }
     }
   }

@@ -26,9 +26,9 @@ public final class GraphQLQueryWatcher<Query: GraphQLQuery>: Cancellable, Apollo
   }
   
   func fetch(cachePolicy: CachePolicy) {
-    fetching = client?._fetch(query: query, cachePolicy: cachePolicy, context: &context, queue: handlerQueue) { (result, error) in
+    fetching = client?._fetch(query: query, cachePolicy: cachePolicy, context: &context, queue: handlerQueue) { (json, result, error) in
       self.dependentKeys = result?.dependentKeys
-      self.resultHandler(result, error)
+      self.resultHandler(json, result, error)
     }
   }
   

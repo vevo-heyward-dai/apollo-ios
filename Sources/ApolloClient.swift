@@ -19,7 +19,7 @@ public enum CachePolicy {
 /// A function that returns a cache key for a particular result object. If it returns `nil`, a default cache key based on the field path will be used.
 public typealias CacheKeyForObject = (_ object: JSONObject) -> JSONValue?
 
-public typealias OperationResultHandler<Operation: GraphQLOperation> = (_ result: GraphQLResult<Operation.Data>?, _ error: Error?) -> Void
+public typealias OperationResultHandler<Operation: GraphQLOperation> = (_ json:JSONObject?, _ result: GraphQLResult<Operation.Data>?, _ error: Error?) -> Void
 
 /// The `ApolloClient` class provides the core API for Apollo. This API provides methods to fetch and watch queries, and to perform mutations.
 public class ApolloClient {
@@ -111,17 +111,17 @@ public class ApolloClient {
   }
 
   fileprivate func send<Operation: GraphQLOperation>(operation: Operation, context: UnsafeMutableRawPointer?, handlerQueue: DispatchQueue, resultHandler: OperationResultHandler<Operation>?) -> Cancellable {
-    func notifyResultHandler(result: GraphQLResult<Operation.Data>?, error: Error?) {
+    func notifyResultHandler(json: JSONObject?, result: GraphQLResult<Operation.Data>?, error: Error?) {
       guard let resultHandler = resultHandler else { return }
       
       handlerQueue.async {
-        resultHandler(result, error)
+        resultHandler(json, result, error)
       }
     }
     
     return networkTransport.send(operation: operation) { (response, error) in
       guard let response = response else {
-        notifyResultHandler(result: nil, error: error)
+        notifyResultHandler(json:nil, result: nil, error: error)
         return
       }
       
@@ -129,13 +129,13 @@ public class ApolloClient {
         do {
           let (result, records) = try response.parseResult(cacheKeyForObject: self.cacheKeyForObject)
           
-          notifyResultHandler(result: result, error: nil)
+            notifyResultHandler(json:response.body, result: result, error: nil)
           
           if let records = records {
             self.store.publish(records: records, context: context)
           }
         } catch {
-          notifyResultHandler(result: nil, error: error)
+            notifyResultHandler(json: nil, result: nil, error: error)
         }
       }
     }
@@ -174,9 +174,9 @@ private final class FetchQueryOperation<Query: GraphQLQuery>: AsynchronousOperat
       return
     }
     
-    client.store.load(query: query, cacheKeyForObject: client.cacheKeyForObject) { (result, error) in
+    client.store.load(query: query, cacheKeyForObject: client.cacheKeyForObject) { (json, result, error) in
       if error == nil {
-        self.notifyResultHandler(result: result, error: nil)
+        self.notifyResultHandler(json:json, result: result, error: nil)
         self.state = .finished
         return
       }
@@ -187,7 +187,7 @@ private final class FetchQueryOperation<Query: GraphQLQuery>: AsynchronousOperat
       }
       
       if self.cachePolicy == .returnCacheDataDontFetch {
-        self.notifyResultHandler(result: nil, error: nil)
+        self.notifyResultHandler(json:nil, result: nil, error: nil)
         self.state = .finished
         return
       }
@@ -197,8 +197,8 @@ private final class FetchQueryOperation<Query: GraphQLQuery>: AsynchronousOperat
   }
   
   func fetchFromNetwork() {
-    networkTask = client.send(operation: query, context: context, handlerQueue: handlerQueue) { (result, error) in
-      self.notifyResultHandler(result: result, error: error)
+    networkTask = client.send(operation: query, context: context, handlerQueue: handlerQueue) { (json, result, error) in
+        self.notifyResultHandler(json: json, result: result, error: error)
       self.state = .finished
       return
     }
@@ -209,11 +209,11 @@ private final class FetchQueryOperation<Query: GraphQLQuery>: AsynchronousOperat
     networkTask?.cancel()
   }
   
-  func notifyResultHandler(result: GraphQLResult<Query.Data>?, error: Error?) {
+  func notifyResultHandler(json:JSONObject?, result: GraphQLResult<Query.Data>?, error: Error?) {
     guard let resultHandler = resultHandler else { return }
     
     handlerQueue.async {
-      resultHandler(result, error)
+      resultHandler(json, result, error)
     }
   }
 }
